@@ -8,7 +8,8 @@
       "situacoes_ids": [],
       "label_printer": "termica_coruripe",
       "print_danfe": false,
-      "label_format": "ZPL"
+      "label_format": "PDF",
+      "print_backend": "sumatra"
     },
     {
       "name": "holambra",

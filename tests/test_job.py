@@ -148,3 +148,12 @@ def test_danfe_printed_only_on_a4_printer(env, tmp_path):
     job.tick(cfg, store, cl, st, n, now=T0 + 60 + 31 * 60)
     job.tick(cfg, store, cl, st, n, now=T0 + 60 + 32 * 60)
     assert ("termica", "coruripe_7_etiqueta.zpl") in printed and ("laser", "coruripe_7_danfe.pdf") in printed
+
+
+def test_windows_backend_builds_silent_pdf_command(monkeypatch):
+    calls = []
+    monkeypatch.setattr(printing.subprocess, "run", lambda cmd, **k: calls.append(cmd))
+    printing.send("Label", Path("e.pdf"), backend="sumatra", sumatra="S.exe")
+    assert calls[0][:3] == ["S.exe", "-print-to", "Label"] and "-silent" in calls[0]
+    with pytest.raises(ValueError):
+        printing.send("Label", Path("e.zpl"), raw=True, backend="sumatra")

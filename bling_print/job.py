@@ -100,9 +100,11 @@ def _print_when_authorized(cfg, store, client, state, notify, row, now):
             log.info("[dry-run] imprimiria pedido %s", oid)
             return
         if store.label_printer:
-            printing.send(store.label_printer, label, raw=store.label_format == "ZPL", title=f"Etiqueta {oid}")
+            printing.send(store.label_printer, label, raw=store.label_format == "ZPL", title=f"Etiqueta {oid}",
+                          backend=store.print_backend, sumatra=store.sumatra_path)
         if danfe:
-            printing.send(store.a4_printer, danfe, title=f"DANFE {oid}")
+            printing.send(store.a4_printer, danfe, title=f"DANFE {oid}",
+                          backend=store.print_backend, sumatra=store.sumatra_path)
         state.put(store.name, oid, status="printed", printed_at=now)
     except Exception as e:
         tries = max(row["tries"], 0) + 1

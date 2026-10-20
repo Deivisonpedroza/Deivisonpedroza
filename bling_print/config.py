@@ -19,6 +19,8 @@ class Store:
     a4_printer: str = ""
     print_danfe: bool = True
     label_format: str = "ZPL"
+    print_backend: str = "cups"  # "cups" (Linux) ou "sumatra" (Windows)
+    sumatra_path: str = "SumatraPDF.exe"
 
 
 @dataclass(frozen=True)
@@ -48,6 +50,8 @@ class Settings:
                 a4_printer=s.get("a4_printer", ""),
                 print_danfe=s.get("print_danfe", True),
                 label_format=s.get("label_format", "ZPL").upper(),
+                print_backend=s.get("print_backend", "cups"),
+                sumatra_path=s.get("sumatra_path", "SumatraPDF.exe"),
             )
             for s in raw["stores"]
         ]
