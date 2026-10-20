@@ -66,11 +66,18 @@ Para achar `loja_id` e `situacoes_ids`, veja no Bling (Vendas → Pedidos) a loj
 ```
 Só avance quando todos funcionarem. Se a etiqueta de teste sair cortada, ajuste o papel nas preferências da impressora.
 
-## 7. Ligar de verdade (em 2 etapas)
-1. **Semana 1 — só imprime:** deixe `AUTO_EMIT_NFE=false`. A secretária continua emitindo; o robô imprime a etiqueta
-   das notas já autorizadas. Confira que cada etiqueta sai certa e que nenhuma sai duas vezes.
-2. **Depois, emissão automática:** coloque `AUTO_EMIT_NFE=true` **depois** de conferir com um pedido real que a
-   nota saiu pelo CNPJ da matriz (45.410.144/0001-54) e com os impostos corretos.
+## 7. Descobrir como o Bling responde (leitura apenas, nao altera nada)
+```
+.venv\Scripts\python -m bling_print probe --store coruripe
+```
+Gera `data\probe.json` com so a **estrutura** das respostas (sem nome, endereco ou CPF de clientes).
+Esse arquivo me permite confirmar os campos reais antes de ligar a impressao automatica.
 
-Para o robô rodar sozinho: dê dois cliques em `deploy\windows\instalar-inicio-automatico.bat` e ative o login
-automático do Windows. Na BIOS do mini-PC, ative "ligar após queda de energia".
+## 8. Ligar de verdade
+Em Coruripe **o Bling ja emite a NF-e**; o robo NAO emite nada (`AUTO_EMIT_NFE=false`, deixe assim).
+O robo: espera 30 min, confere se o pedido nao foi cancelado, espera a nota estar **autorizada**
+e imprime a etiqueta Shopee. Se a nota nao autorizar (SEFAZ fora) ou a etiqueta nao sair, voce recebe
+alerta no Telegram. Na 1a semana, mantenha a secretaria conferindo em paralelo.
+
+Para o robo rodar sozinho: dois cliques em `deploy\windows\instalar-inicio-automatico.bat`, login
+automatico do Windows e, na BIOS do mini-PC, "ligar apos queda de energia".

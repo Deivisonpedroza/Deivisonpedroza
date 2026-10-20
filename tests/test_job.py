@@ -190,3 +190,28 @@ def test_testprint_pdf_and_zpl(tmp_path, monkeypatch):
     testprint.run(Store("c", "i", "s", "1", [], "Label", label_format="PDF", print_backend="sumatra"), tmp_path)
     testprint.run(Store("c", "i", "s", "1", [], "Label", label_format="ZPL"), tmp_path)
     assert sent == [("Label", ".pdf", False), ("Label", ".zpl", True)]
+
+
+def test_without_auto_emit_waits_for_bling_nfe_alerts_once_then_prints(env):
+    import dataclasses
+    cfg, store, cl, st, n, printed = env
+    cfg = dataclasses.replace(cfg, auto_emit_nfe=False)
+    job.tick(cfg, store, cl, st, n, now=T0)
+    cl.orders = [7]
+    job.tick(cfg, store, cl, st, n, now=T0 + 60)
+    job.tick(cfg, store, cl, st, n, now=T0 + 40 * 60)  # passou a espera, ainda sem NF: nao alerta ainda
+    assert cl.gen_calls == 0 and not n.msgs[1:]
+    job.tick(cfg, store, cl, st, n, now=T0 + 100 * 60)  # passou 30+30 min
+    job.tick(cfg, store, cl, st, n, now=T0 + 110 * 60)
+    assert len([m for m in n.msgs if "sem NF-e" in m]) == 1  # alerta uma unica vez
+    cl.has_nfe[7] = 555  # o Bling autorizou depois
+    job.tick(cfg, store, cl, st, n, now=T0 + 120 * 60)
+    job.tick(cfg, store, cl, st, n, now=T0 + 121 * 60)
+    assert cl.gen_calls == 0 and [f for _, f in printed] == ["coruripe_7_etiqueta.zpl"]
+
+
+def test_probe_shape_masks_personal_values_keeps_situacao():
+    from bling_print.probe import shape
+    r = shape({"contato": {"nome": "Maria", "cpf": "1"}, "situacao": {"id": 9, "valor": 1}, "itens": [{"q": 2}]})
+    assert r == {"contato": {"nome": "<str>", "cpf": "<str>"}, "situacao": {"id": 9, "valor": 1},
+                 "itens": [{"q": "<int>"}]}

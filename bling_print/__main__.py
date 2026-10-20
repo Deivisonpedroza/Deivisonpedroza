@@ -17,7 +17,7 @@ def _clients(cfg: Settings) -> dict[str, BlingClient]:
 
 def main() -> int:
     p = argparse.ArgumentParser(prog="bling_print")
-    p.add_argument("cmd", choices=["auth", "check", "once", "watch", "telegram", "testprint"])
+    p.add_argument("cmd", choices=["auth", "check", "once", "watch", "telegram", "testprint", "probe"])
     p.add_argument("--store", help="nome da loja (para auth/check)")
     p.add_argument("--dry-run", action="store_true", help="nao emite NF-e nem imprime")
     args = p.parse_args()
@@ -45,6 +45,18 @@ def main() -> int:
     clients = _clients(cfg)
     state = State(cfg.data_dir / "state.db")
     notify = Notifier(cfg.telegram_token, cfg.telegram_chat_id)
+
+    if args.cmd == "probe":
+        if not args.store:
+            print("Use --store NOME. Lojas:", ", ".join(clients))
+            return 2
+        from .probe import dump
+        st = next(x for x in cfg.stores if x.name == args.store)
+        text = dump(clients[args.store], st.loja_id, st.situacoes_ids)
+        (cfg.data_dir / "probe.json").write_text(text, encoding="utf-8")
+        print(text)
+        print("\nSalvo em data/probe.json (so estrutura, sem dados de clientes).")
+        return 0
 
     if args.cmd in ("auth", "check"):
         if not args.store:

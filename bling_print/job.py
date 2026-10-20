@@ -10,7 +10,7 @@ from .state import State
 
 log = logging.getLogger("bling_print")
 NFE_AUTORIZADA = 5  # situacao "Autorizada" no Bling (conferir na homologacao)
-MAX_PRINT_TRIES = 3
+MAX_PRINT_TRIES = 6  # ~30 min de tentativas (a cada 5 min) antes de chamar um humano
 LOOKBACK_DAYS = 3
 
 
@@ -52,12 +52,17 @@ def _emit(cfg, store, client, state, notify, row, now):
             return
         nfe_id = (order.get("notaFiscal") or {}).get("id")
         if nfe_id:
-            state.put(store.name, oid, status="awaiting_nfe", nfe_id=str(nfe_id),
+            state.put(store.name, oid, status="awaiting_nfe", nfe_id=str(nfe_id), tries=0,
                       nfe_requested_at=row["nfe_requested_at"] or now)
             return
         if not cfg.auto_emit_nfe:
-            state.put(store.name, oid, status="needs_nfe")
-            notify.alert(f"[{store.name}] Pedido {row['numero']} sem NF-e e emissao automatica desligada.")
+            # Coruripe: quem emite a NF-e e o proprio Bling. O robo so espera a nota aparecer.
+            limit = (cfg.delay_minutes + cfg.nfe_timeout_minutes) * 60
+            if now - row["first_seen"] > limit and row["tries"] != -1:
+                state.put(store.name, oid, tries=-1)  # -1 = ja alertado; segue esperando
+                notify.alert(f"[{store.name}] Pedido {row['numero']}: ainda sem NF-e no Bling apos "
+                             f"{cfg.delay_minutes + cfg.nfe_timeout_minutes} min (SEFAZ fora do ar?). "
+                             "O robo continua esperando; a etiqueta sai quando a nota autorizar.")
             return
         if cfg.dry_run:
             log.info("[dry-run] emitiria NF-e do pedido %s", oid)
@@ -111,7 +116,8 @@ def _print_when_authorized(cfg, store, client, state, notify, row, now):
         log.exception("Impressao do pedido %s falhou (tentativa %d)", oid, tries)
         if tries >= MAX_PRINT_TRIES:
             state.put(store.name, oid, status="error", tries=tries, error=str(e)[:300])
-            notify.alert(f"[{store.name}] Pedido {row['numero']}: NF-e autorizada mas NAO imprimiu "
-                         f"({tries} tentativas). Erro: {e}")
+            notify.alert(f"[{store.name}] Pedido {row['numero']}: NF-e autorizada mas a etiqueta NAO saiu "
+                         f"({tries} tentativas). Confira se os dados fiscais foram enviados a Shopee "
+                         f"(Bling > Notas fiscais > Enviar dados para a loja virtual). Erro: {e}")
         else:
             state.put(store.name, oid, tries=tries)

@@ -5,7 +5,7 @@ A cada 5 min ele olha o Bling de cada loja (Coruripe, Holambra). Para cada pedid
 
 1. espera **30 min** (conta a partir de quando o robô viu o pedido), para dar tempo de cancelamento;
 2. confere de novo se o pedido continua válido (se foi cancelado, **não emite**);
-3. emite a NF-e no Bling (se `AUTO_EMIT_NFE=true`) e espera autorizar;
+3. espera a NF-e estar **autorizada** (em Coruripe quem emite e o proprio Bling; so emite se `AUTO_EMIT_NFE=true`);
 4. imprime a etiqueta 10x15 na térmica da loja (o DANFE A4 só sai se a loja tiver `a4_printer`);
 5. manda **alerta no Telegram** se algo falhar (ninguém precisa ficar olhando tela).
 
