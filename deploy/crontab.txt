@@ -1,6 +1,0 @@
-# Instalar com: crontab deploy/crontab.txt  (usuario que tem acesso ao CUPS)
-CRON_TZ=America/Sao_Paulo
-# Segunda a sexta, 13:30
-30 13 * * 1-5 cd /opt/bling-print && .venv/bin/python -m bling_print run >> data/run.log 2>&1
-# Sabado, 08:00
-0 8 * * 6 cd /opt/bling-print && .venv/bin/python -m bling_print run >> data/run.log 2>&1

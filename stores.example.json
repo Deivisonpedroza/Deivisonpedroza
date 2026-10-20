@@ -1,0 +1,24 @@
+{
+  "stores": [
+    {
+      "name": "coruripe",
+      "client_id": "",
+      "client_secret": "",
+      "loja_id": "",
+      "situacoes_ids": [],
+      "label_printer": "termica_coruripe",
+      "print_danfe": true,
+      "label_format": "ZPL"
+    },
+    {
+      "name": "holambra",
+      "client_id": "",
+      "client_secret": "",
+      "loja_id": "",
+      "situacoes_ids": [],
+      "label_printer": "termica_holambra",
+      "print_danfe": true,
+      "label_format": "ZPL"
+    }
+  ]
+}

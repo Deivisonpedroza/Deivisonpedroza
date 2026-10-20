@@ -1,5 +1,6 @@
+import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -8,29 +9,56 @@ def _bool(name: str, default: bool = False) -> bool:
 
 
 @dataclass(frozen=True)
-class Config:
+class Store:
+    name: str
     client_id: str
     client_secret: str
     loja_id: str
     situacoes_ids: list[str]
-    auto_emit_nfe: bool
     label_printer: str
-    a4_printer: str
-    label_format: str
+    a4_printer: str = ""
+    print_danfe: bool = True
+    label_format: str = "ZPL"
+
+
+@dataclass(frozen=True)
+class Settings:
+    stores: list[Store]
+    auto_emit_nfe: bool
+    delay_minutes: int
+    poll_seconds: int
+    nfe_timeout_minutes: int
     data_dir: Path
     dry_run: bool
+    telegram_token: str = ""
+    telegram_chat_id: str = ""
 
     @classmethod
-    def from_env(cls) -> "Config":
+    def load(cls, stores_file: str | None = None) -> "Settings":
+        path = Path(stores_file or os.getenv("STORES_FILE", "stores.json"))
+        raw = json.loads(path.read_text())
+        stores = [
+            Store(
+                name=s["name"],
+                client_id=s["client_id"],
+                client_secret=s["client_secret"],
+                loja_id=str(s.get("loja_id", "")),
+                situacoes_ids=[str(x) for x in s.get("situacoes_ids", [])],
+                label_printer=s.get("label_printer", ""),
+                a4_printer=s.get("a4_printer", ""),
+                print_danfe=s.get("print_danfe", True),
+                label_format=s.get("label_format", "ZPL").upper(),
+            )
+            for s in raw["stores"]
+        ]
         return cls(
-            client_id=os.getenv("BLING_CLIENT_ID", ""),
-            client_secret=os.getenv("BLING_CLIENT_SECRET", ""),
-            loja_id=os.getenv("BLING_LOJA_ID_SHOPEE", ""),
-            situacoes_ids=[s.strip() for s in os.getenv("BLING_SITUACOES_IDS", "").split(",") if s.strip()],
+            stores=stores,
             auto_emit_nfe=_bool("AUTO_EMIT_NFE", False),
-            label_printer=os.getenv("LABEL_PRINTER", ""),
-            a4_printer=os.getenv("A4_PRINTER", ""),
-            label_format=os.getenv("LABEL_FORMAT", "ZPL").upper(),
+            delay_minutes=int(os.getenv("DELAY_MINUTES", "30")),
+            poll_seconds=int(os.getenv("POLL_SECONDS", "300")),
+            nfe_timeout_minutes=int(os.getenv("NFE_TIMEOUT_MINUTES", "30")),
             data_dir=Path(os.getenv("DATA_DIR", "./data")),
             dry_run=_bool("DRY_RUN", False),
+            telegram_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
+            telegram_chat_id=os.getenv("TELEGRAM_CHAT_ID", ""),
         )

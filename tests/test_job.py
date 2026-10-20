@@ -1,24 +1,54 @@
-from datetime import date
 from pathlib import Path
 
-from bling_print.config import Config
-from bling_print.job import run
+import pytest
+
+from bling_print import job, printing
+from bling_print.config import Settings, Store
+from bling_print.notify import Notifier
 from bling_print.state import State
 
+T0 = 1_800_000_000.0
+ELIG = "15"
 
-class FakeClient:
-    def __init__(self, nfe_situacao=5):
-        self.nfe_situacao = nfe_situacao
+
+class Notes(Notifier):
+    def __init__(self):
+        super().__init__()
+        self.msgs = []
+
+    def alert(self, text):
+        self.msgs.append(text)
+
+
+class Fake:
+    def __init__(self):
+        self.orders = []
+        self.has_nfe = {}
+        self.sit = {}
+        self.gen_calls = 0
+        self.fail_generate = False
+        self.nfe_situacao = 5
 
     def list_orders(self, *a):
-        return [{"id": 1}, {"id": 2}]
+        return [{"id": i, "numero": f"N{i}"} for i in self.orders]
 
     def get_order(self, oid):
-        return {"id": oid, "numero": str(oid), "notaFiscal": {"id": 10 + oid} if oid == 1 else {},
-                "itens": [{"codigo": "A", "descricao": "Item A", "quantidade": 2}], "contato": {"nome": "Cli"}}
+        oid = int(oid)
+        nf = {"id": self.has_nfe[oid]} if oid in self.has_nfe else {}
+        return {"id": oid, "situacao": {"id": self.sit.get(oid, int(ELIG))}, "notaFiscal": nf}
+
+    def generate_nfe(self, oid):
+        oid = int(oid)
+        self.gen_calls += 1
+        if self.fail_generate:
+            raise RuntimeError("SEFAZ fora")
+        return 900 + oid
+
+    def send_nfe(self, nid):
+        pass
 
     def get_nfe(self, nid):
-        return {"situacao": self.nfe_situacao, "linkPdf": "http://x/danfe.pdf"}
+        return {"situacao": self.nfe_situacao, "linkPdf": "http://x"}
 
     def download(self, url):
         return b"%PDF"
@@ -27,23 +57,82 @@ class FakeClient:
         return b"^XA^XZ"
 
 
-def cfg(tmp, **kw):
-    base = dict(client_id="", client_secret="", loja_id="", situacoes_ids=[], auto_emit_nfe=False,
-                label_printer="", a4_printer="", label_format="ZPL", data_dir=Path(tmp), dry_run=False)
-    base.update(kw)
-    return Config(**base)
+@pytest.fixture
+def env(tmp_path, monkeypatch):
+    printed = []
+    monkeypatch.setattr(printing, "send", lambda p, f, **k: printed.append((p, Path(f).name)))
+    store = Store("coruripe", "id", "sec", "1", [ELIG], "termica")
+    cfg = Settings([store], True, 30, 300, 30, tmp_path, False)
+    return cfg, store, Fake(), State(tmp_path / "s.db"), Notes(), printed
 
 
-def test_only_orders_with_authorized_nfe_are_printed_and_not_repeated(tmp_path):
-    st = State(tmp_path / "s.db")
-    r = run(cfg(tmp_path), FakeClient(), st, today=date(2026, 1, 5))
-    assert r["printed"] == [1]
-    assert r["skipped"][0][0] == 2  # sem NF-e e AUTO_EMIT_NFE=false
-    assert (tmp_path / "out/2026-01-05/lista_separacao.pdf").exists()
-    r2 = run(cfg(tmp_path), FakeClient(), st, today=date(2026, 1, 5))
-    assert r2["printed"] == []  # nao reimprime
+def run(env, t):
+    cfg, store, cl, st, n, _ = env
+    job.tick(cfg, store, cl, st, n, now=T0 + t)
 
 
-def test_unauthorized_nfe_is_skipped(tmp_path):
-    r = run(cfg(tmp_path), FakeClient(nfe_situacao=3), State(tmp_path / "s.db"), today=date(2026, 1, 5))
-    assert r["printed"] == []
+def test_first_run_ignores_existing_orders(env):
+    env[2].orders = [1, 2]
+    run(env, 0)
+    run(env, 3600)
+    assert env[2].gen_calls == 0 and env[5] == []
+    assert "IGNORADOS" in env[4].msgs[0]
+
+
+def test_waits_30_min_then_emits_and_prints_once(env):
+    cl = env[2]
+    run(env, 0)  # baseline vazio
+    cl.orders = [7]
+    run(env, 60)
+    run(env, 60 + 29 * 60)
+    assert cl.gen_calls == 0  # ainda dentro dos 30 min
+    run(env, 60 + 30 * 60)
+    assert cl.gen_calls == 1
+    run(env, 60 + 31 * 60)
+    run(env, 60 + 40 * 60)
+    assert cl.gen_calls == 1  # nunca emite duas vezes
+    assert [f for _, f in env[5]] == ["coruripe_7_etiqueta.zpl", "coruripe_7_danfe.pdf"]
+
+
+def test_cancelled_during_wait_is_not_emitted(env):
+    cl = env[2]
+    run(env, 0)
+    cl.orders = [7]
+    run(env, 60)
+    cl.sit[7] = 12  # virou cancelado
+    run(env, 60 + 31 * 60)
+    assert cl.gen_calls == 0 and env[3].get("coruripe", 7)["status"] == "changed"
+
+
+def test_emission_error_alerts_and_never_retries(env):
+    cl = env[2]
+    run(env, 0)
+    cl.orders = [7]
+    cl.fail_generate = True
+    run(env, 60)
+    run(env, 60 + 31 * 60)
+    run(env, 60 + 40 * 60)
+    assert cl.gen_calls == 1
+    assert env[3].get("coruripe", 7)["status"] == "error" and "SEFAZ" in env[4].msgs[-1]
+
+
+def test_existing_nfe_is_reused_not_reissued(env):
+    cl = env[2]
+    run(env, 0)
+    cl.orders = [7]
+    cl.has_nfe[7] = 555
+    run(env, 60)
+    run(env, 60 + 31 * 60)
+    run(env, 60 + 32 * 60)
+    assert cl.gen_calls == 0 and len(env[5]) == 2
+
+
+def test_unauthorized_nfe_alerts_after_timeout(env):
+    cl = env[2]
+    cl.nfe_situacao = 3
+    run(env, 0)
+    cl.orders = [7]
+    run(env, 60)
+    run(env, 60 + 31 * 60)
+    run(env, 60 + 70 * 60)
+    assert env[5] == [] and "nao autorizada" in env[4].msgs[-1]
