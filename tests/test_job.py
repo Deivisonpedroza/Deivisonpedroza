@@ -215,3 +215,14 @@ def test_probe_shape_masks_personal_values_keeps_situacao():
     r = shape({"contato": {"nome": "Maria", "cpf": "1"}, "situacao": {"id": 9, "valor": 1}, "itens": [{"q": 2}]})
     assert r == {"contato": {"nome": "<str>", "cpf": "<str>"}, "situacao": {"id": 9, "valor": 1},
                  "itens": [{"q": "<int>"}]}
+
+
+def test_problems_lists_missing_fields_and_list_orders_honors_max_pages():
+    from bling_print.client import BlingClient
+    s = Store("coruripe", "id", "sec", "", [], "")
+    cfg = Settings([s], False, 30, 300, 30, Path("."), False)
+    assert len(cfg.problems()) == 3  # loja_id, situacoes_ids, label_printer
+    calls = []
+    c = BlingClient("a", "b", Path("t.json"))
+    c.request = lambda m, p, **k: (calls.append(k["params"]["pagina"]) or {"data": [{"id": i} for i in range(100)]})
+    assert len(c.list_orders("", [], "2000-01-01", max_pages=1)) == 100 and calls == [1]

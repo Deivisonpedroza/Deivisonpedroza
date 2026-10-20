@@ -109,7 +109,7 @@ class BlingClient:
         raise BlingError(f"{method} {path}: tentativas esgotadas")
 
     # ---------- Operacoes ----------
-    def list_orders(self, loja_id: str, situacoes: list[str], data_inicial: str) -> list[dict]:
+    def list_orders(self, loja_id: str, situacoes: list[str], data_inicial: str, max_pages: int | None = None) -> list[dict]:
         orders, page = [], 1
         while True:
             params = {
@@ -122,7 +122,7 @@ class BlingClient:
                 params["idLoja"] = loja_id
             data = self.request("GET", Endpoints.PEDIDOS, params=params).get("data", [])
             orders += data
-            if len(data) < 100:
+            if len(data) < 100 or (max_pages and page >= max_pages):
                 return orders
             page += 1
 

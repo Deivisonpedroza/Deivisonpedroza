@@ -7,7 +7,7 @@ import json
 
 from .client import BlingClient, Endpoints
 
-KEEP_VALUES = {"situacao"}  # valores desses campos nao sao dados pessoais e ajudam a mapear os codigos
+KEEP_VALUES = {"situacao", "loja"}  # valores desses campos nao sao dados pessoais e ajudam a mapear os codigos
 
 
 def shape(obj, key=None, keep=False):
@@ -24,7 +24,7 @@ def shape(obj, key=None, keep=False):
 def run(client: BlingClient, loja_id: str, situacoes: list[str]) -> dict:
     out: dict = {}
     since = "2000-01-01"
-    orders = client.list_orders(loja_id, situacoes, since)[:3]
+    orders = client.list_orders(loja_id, situacoes, since, max_pages=1)[:3]
     out["pedidos_lista (3 primeiros)"] = shape(orders)
     if not orders:
         return out

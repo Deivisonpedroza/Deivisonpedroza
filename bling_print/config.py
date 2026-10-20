@@ -47,6 +47,17 @@ class Settings:
     telegram_token: str = ""
     telegram_chat_id: str = ""
 
+    def problems(self) -> list[str]:
+        """Campos que PRECISAM estar preenchidos antes de rodar o robo de verdade."""
+        out = []
+        for st in self.stores:
+            for field_name, label in (("client_id", "client_id"), ("client_secret", "client_secret"),
+                                      ("loja_id", "loja_id"), ("situacoes_ids", "situacoes_ids"),
+                                      ("label_printer", "label_printer")):
+                if not getattr(st, field_name):
+                    out.append(f"[{st.name}] falta preencher {label} no stores.json")
+        return out
+
     @classmethod
     def load(cls, stores_file: str | None = None) -> "Settings":
         load_env()

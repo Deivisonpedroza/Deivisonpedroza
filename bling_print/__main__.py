@@ -64,12 +64,17 @@ def main() -> int:
             return 2
         c = clients[args.store]
         if args.cmd == "auth":
-            print("Autorize o app dessa loja no Bling e cole o 'code' da URL de retorno (vale ~1 min).")
-            c.exchange_code(input("code: ").strip())
+            import secrets
+            print("1) Abra este link no navegador, com o Bling da conta MATRIZ ja aberto, e clique em autorizar:\n")
+            print(f"https://www.bling.com.br/Api/v3/oauth/authorize?response_type=code&client_id={c.client_id}"
+                  f"&state={secrets.token_hex(8)}\n")
+            print("2) A pagina seguinte pode dar erro: e normal. Olhe o endereco no topo do navegador e copie o")
+            print("   pedaco que vem depois de 'code=' (ate o '&', se houver). Ele vale so ~1 minuto.\n")
+            c.exchange_code(input("Cole o code aqui e aperte Enter: ").strip())
             print("Tokens salvos.")
         else:
             st = next(s for s in cfg.stores if s.name == args.store)
-            found = c.list_orders(st.loja_id, st.situacoes_ids, "2000-01-01")[:1]
+            found = c.list_orders(st.loja_id, st.situacoes_ids, "2000-01-01", max_pages=1)[:1]
             print("Conexao OK. Exemplo:", found[0] if found else "nenhum pedido")
         return 0
 
@@ -82,6 +87,12 @@ def main() -> int:
         testprint(st, cfg.data_dir)
         print("Enviado para a impressora. Confira se saiu inteiro, centralizado e legivel em 10x15.")
         return 0
+
+    bad = cfg.problems()
+    if bad and not cfg.dry_run:
+        print("Ainda falta preencher:\n  " + "\n  ".join(bad))
+        print("Rode primeiro o passo 'ler o Bling' e me envie o resultado para eu completar.")
+        return 2
 
     while True:
         for s in cfg.stores:
