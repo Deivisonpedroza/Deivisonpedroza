@@ -93,7 +93,7 @@ def _print_when_authorized(cfg, store, client, state, notify, row, now):
         label.write_bytes(client.get_label(oid, store.label_format))
         danfe = None
         link = nfe.get("linkPdf") or nfe.get("linkDanfe")
-        if store.print_danfe and link:
+        if store.print_danfe and store.a4_printer and link:  # DANFE e A4: nunca na termica 10x15
             danfe = out / f"{store.name}_{oid}_danfe.pdf"
             danfe.write_bytes(client.download(link))
         if cfg.dry_run:
@@ -102,7 +102,7 @@ def _print_when_authorized(cfg, store, client, state, notify, row, now):
         if store.label_printer:
             printing.send(store.label_printer, label, raw=store.label_format == "ZPL", title=f"Etiqueta {oid}")
         if danfe:
-            printing.send(store.a4_printer or store.label_printer, danfe, title=f"DANFE {oid}")
+            printing.send(store.a4_printer, danfe, title=f"DANFE {oid}")
         state.put(store.name, oid, status="printed", printed_at=now)
     except Exception as e:
         tries = max(row["tries"], 0) + 1

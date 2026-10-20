@@ -91,7 +91,7 @@ def test_waits_30_min_then_emits_and_prints_once(env):
     run(env, 60 + 31 * 60)
     run(env, 60 + 40 * 60)
     assert cl.gen_calls == 1  # nunca emite duas vezes
-    assert [f for _, f in env[5]] == ["coruripe_7_etiqueta.zpl", "coruripe_7_danfe.pdf"]
+    assert [f for _, f in env[5]] == ["coruripe_7_etiqueta.zpl"]  # sem a4_printer: DANFE nao vai p/ termica
 
 
 def test_cancelled_during_wait_is_not_emitted(env):
@@ -124,7 +124,7 @@ def test_existing_nfe_is_reused_not_reissued(env):
     run(env, 60)
     run(env, 60 + 31 * 60)
     run(env, 60 + 32 * 60)
-    assert cl.gen_calls == 0 and len(env[5]) == 2
+    assert cl.gen_calls == 0 and len(env[5]) == 1
 
 
 def test_unauthorized_nfe_alerts_after_timeout(env):
@@ -136,3 +136,15 @@ def test_unauthorized_nfe_alerts_after_timeout(env):
     run(env, 60 + 31 * 60)
     run(env, 60 + 70 * 60)
     assert env[5] == [] and "nao autorizada" in env[4].msgs[-1]
+
+
+def test_danfe_printed_only_on_a4_printer(env, tmp_path):
+    cfg, _, cl, st, n, printed = env
+    store = Store("coruripe", "id", "sec", "1", [ELIG], "termica", a4_printer="laser")
+    cl.orders = []
+    job.tick(cfg, store, cl, st, n, now=T0)
+    cl.orders = [7]
+    job.tick(cfg, store, cl, st, n, now=T0 + 60)
+    job.tick(cfg, store, cl, st, n, now=T0 + 60 + 31 * 60)
+    job.tick(cfg, store, cl, st, n, now=T0 + 60 + 32 * 60)
+    assert ("termica", "coruripe_7_etiqueta.zpl") in printed and ("laser", "coruripe_7_danfe.pdf") in printed

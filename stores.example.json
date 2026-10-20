@@ -7,7 +7,7 @@
       "loja_id": "",
       "situacoes_ids": [],
       "label_printer": "termica_coruripe",
-      "print_danfe": true,
+      "print_danfe": false,
       "label_format": "ZPL"
     },
     {
@@ -17,7 +17,7 @@
       "loja_id": "",
       "situacoes_ids": [],
       "label_printer": "termica_holambra",
-      "print_danfe": true,
+      "print_danfe": false,
       "label_format": "ZPL"
     }
   ]
