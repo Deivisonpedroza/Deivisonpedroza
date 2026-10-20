@@ -4,9 +4,9 @@ import sys
 import time
 
 from .client import BlingClient
-from .config import Settings
+from .config import Settings, load_env
 from .job import tick
-from .notify import Notifier
+from .notify import Notifier, find_chat_id
 from .state import State
 
 
@@ -17,11 +17,27 @@ def _clients(cfg: Settings) -> dict[str, BlingClient]:
 
 def main() -> int:
     p = argparse.ArgumentParser(prog="bling_print")
-    p.add_argument("cmd", choices=["auth", "check", "once", "watch"])
+    p.add_argument("cmd", choices=["auth", "check", "once", "watch", "telegram", "testprint"])
     p.add_argument("--store", help="nome da loja (para auth/check)")
     p.add_argument("--dry-run", action="store_true", help="nao emite NF-e nem imprime")
     args = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+    load_env()
+    if args.cmd == "telegram":
+        import os
+        token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        if not token:
+            print("Coloque TELEGRAM_BOT_TOKEN no arquivo .env primeiro.")
+            return 2
+        found = find_chat_id(token)
+        if not found:
+            print("Nenhuma mensagem encontrada. Abra o seu bot no Telegram, toque em Iniciar, envie 'oi' e rode de novo.")
+            return 1
+        chat_id, name = found
+        print(f"Chat encontrado: {name}\nTELEGRAM_CHAT_ID={chat_id}\nCopie a linha acima para o .env.")
+        Notifier(token, chat_id).alert("Teste: o robo de impressao consegue falar com voce.")
+        return 0
 
     cfg = Settings.load()
     if args.dry_run:
@@ -43,6 +59,16 @@ def main() -> int:
             st = next(s for s in cfg.stores if s.name == args.store)
             found = c.list_orders(st.loja_id, st.situacoes_ids, "2000-01-01")[:1]
             print("Conexao OK. Exemplo:", found[0] if found else "nenhum pedido")
+        return 0
+
+    if args.cmd == "testprint":
+        if not args.store:
+            print("Use --store NOME. Lojas:", ", ".join(clients))
+            return 2
+        from .testprint import run as testprint
+        st = next(x for x in cfg.stores if x.name == args.store)
+        testprint(st, cfg.data_dir)
+        print("Enviado para a impressora. Confira se saiu inteiro, centralizado e legivel em 10x15.")
         return 0
 
     while True:

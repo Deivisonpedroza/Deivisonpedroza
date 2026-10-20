@@ -4,6 +4,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
+def load_env(path: str = ".env") -> None:
+    """Le o arquivo .env (no Windows nao ha EnvironmentFile do systemd). Nao sobrescreve variaveis ja definidas."""
+    f = Path(path)
+    if not f.exists():
+        return
+    for line in f.read_text(encoding="utf-8-sig").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
 def _bool(name: str, default: bool = False) -> bool:
     return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes", "sim")
 
@@ -37,6 +49,7 @@ class Settings:
 
     @classmethod
     def load(cls, stores_file: str | None = None) -> "Settings":
+        load_env()
         path = Path(stores_file or os.getenv("STORES_FILE", "stores.json"))
         raw = json.loads(path.read_text())
         stores = [

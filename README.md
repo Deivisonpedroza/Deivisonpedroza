@@ -17,6 +17,8 @@ A cada 5 min ele olha o Bling de cada loja (Coruripe, Holambra). Para cada pedid
 - `AUTO_EMIT_NFE=false` (padrão): só imprime notas que alguém já emitiu. Ligue só após testar.
 - Erro ao emitir ou ao imprimir = alerta. Impressão tenta 3x; emissão não tenta de novo.
 
+> **Windows (Coruripe): siga `docs/GUIA_CORURIPE.md`.** Comandos extras: `telegram`, `testprint`.
+
 ## Instalação (em cada Pi)
 ```bash
 sudo apt install -y cups python3-venv git

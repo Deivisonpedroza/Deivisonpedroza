@@ -23,3 +23,14 @@ class Notifier:
             )
         except requests.RequestException:
             log.exception("Falha ao enviar alerta")
+
+
+def find_chat_id(token: str) -> tuple[str, str] | None:
+    """Acha o chat que mandou mensagem ao bot (o dono manda 'oi' para o bot antes)."""
+    r = requests.get(f"https://api.telegram.org/bot{token}/getUpdates", timeout=15)
+    r.raise_for_status()
+    for upd in reversed(r.json().get("result", [])):
+        chat = (upd.get("message") or {}).get("chat")
+        if chat:
+            return str(chat["id"]), chat.get("first_name") or chat.get("title") or ""
+    return None

@@ -157,3 +157,36 @@ def test_windows_backend_builds_silent_pdf_command(monkeypatch):
     assert calls[0][:3] == ["S.exe", "-print-to", "Label"] and "-silent" in calls[0]
     with pytest.raises(ValueError):
         printing.send("Label", Path("e.zpl"), raw=True, backend="sumatra")
+
+
+def test_load_env_reads_file_without_overriding(tmp_path, monkeypatch):
+    from bling_print.config import load_env
+    f = tmp_path / ".env"
+    f.write_text('# c\nAUTO_EMIT_NFE="true"\nPOLL_SECONDS=60\nJA_DEFINIDA=nova\n', encoding="utf-8")
+    monkeypatch.setenv("JA_DEFINIDA", "antiga")
+    monkeypatch.delenv("AUTO_EMIT_NFE", raising=False)
+    load_env(str(f))
+    import os
+    assert os.environ["AUTO_EMIT_NFE"] == "true" and os.environ["JA_DEFINIDA"] == "antiga"
+    monkeypatch.delenv("AUTO_EMIT_NFE")
+    monkeypatch.delenv("POLL_SECONDS")
+
+
+def test_find_chat_id_returns_latest_chat(monkeypatch):
+    from bling_print import notify
+
+    class R:
+        def raise_for_status(self): pass
+        def json(self): return {"result": [{"message": {"chat": {"id": 1, "first_name": "A"}}},
+                                           {"message": {"chat": {"id": 42, "first_name": "Deivison"}}}]}
+    monkeypatch.setattr(notify.requests, "get", lambda *a, **k: R())
+    assert notify.find_chat_id("tok") == ("42", "Deivison")
+
+
+def test_testprint_pdf_and_zpl(tmp_path, monkeypatch):
+    from bling_print import testprint
+    sent = []
+    monkeypatch.setattr(printing, "send", lambda p, f, **k: sent.append((p, Path(f).suffix, k["raw"])))
+    testprint.run(Store("c", "i", "s", "1", [], "Label", label_format="PDF", print_backend="sumatra"), tmp_path)
+    testprint.run(Store("c", "i", "s", "1", [], "Label", label_format="ZPL"), tmp_path)
+    assert sent == [("Label", ".pdf", False), ("Label", ".zpl", True)]
